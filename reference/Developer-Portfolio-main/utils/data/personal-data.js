@@ -1,0 +1,17 @@
+export const personalData = {
+  name: "Anubhav Chaturvedi",
+  profile: '/profile.jpg',
+  designation: "Software Developer",
+  description: "My name is Anubhav Chaturvedi. I am a professional and enthusiastic programmer in my daily life. I am a quick learner with a self-learning attitude. I love to learn and explore new technologies and am passionate about problem-solving. I love almost all the stacks of web application development and love to make the web more open to the world. My core skill is based on Python and I love to do most of the things using Python & React. I am available for any kind of job opportunity that suits my skills and interests.",
+  email: 'chaturvedianubhav520@gmail.com',
+  phone: '+919343368280',
+  address: 'Satna , Madhya Pradesh',
+  github: 'https://github.com/AnubhavChaturvedi-GitHub',
+  facebook: 'https://www.facebook.com/IndianYoutuberAndSoftwareDevloper/',
+  linkedIn: 'https://www.linkedin.com/in/anubhav-chaturvedi-/',
+  twitter: 'https://x.com/AnubhavChatu',
+  stackOverflow: 'https://stackoverflow.com/users/27312144/anubhav-chaturvedi',
+  leetcode: "https://leetcode.com/u/Ac520/",
+  devUsername: "anubhav520",
+  resume: "https://drive.google.com/file/d/1QFoOrDKWZDU9rfW923cvZuSYKIufBNbt/view?usp=drive_link",
+}
