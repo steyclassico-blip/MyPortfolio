@@ -23,21 +23,55 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pages[pageId]) {
             pages[pageId].style.display = 'block';
             window.scrollTo({ top: 0, behavior: 'instant' });
+
+            // Reativar animações quando uma página SPA sai de display:none.
+            // O IntersectionObserver inicial não consegue observar elementos
+            // que estavam dentro de uma página escondida.
+            requestAnimationFrame(() => {
+                pages[pageId].querySelectorAll('.reveal').forEach(el => {
+                    el.classList.add('active');
+                });
+                pages[pageId].querySelectorAll('[data-timeline]').forEach(el => {
+                    el.classList.add('is-visible');
+                });
+            });
+        }
+    }
+
+    function navigateLink(link, e) {
+        const href = link.getAttribute('href') || '';
+        const pageId = link.getAttribute('data-page') || 'home';
+        const targetId = href.startsWith('#') ? href.slice(1) : '';
+
+        if (e) e.preventDefault();
+
+        // Internal section on the Home page (for example #projects)
+        if (targetId === 'projects' || targetId === 'home') {
+            showPage('home');
+            requestAnimationFrame(() => {
+                const target = document.getElementById(targetId === 'home' ? 'hero' : targetId);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+            return;
+        }
+
+        // Separate SPA pages
+        if (pages[pageId]) {
+            showPage(pageId);
+            return;
+        }
+
+        // Fallback for any normal anchor
+        if (targetId) {
+            const target = document.getElementById(targetId);
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     }
 
     pageLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            const pageId = link.getAttribute('data-page') || 'home'; // Logo defaults to home
-            const isPageSwitch = pages[pageId] != null;
-            
-            if (isPageSwitch) {
-                if (link.getAttribute('href').startsWith('#') && pageId !== 'home') {
-                    e.preventDefault();
-                }
-                showPage(pageId);
-            }
-        });
+        link.addEventListener('click', (e) => navigateLink(link, e));
     });
 
     // --- Cute mascot follows the mouse softly ---
@@ -69,15 +103,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (menuToggle && mobileMenu) {
         menuToggle.addEventListener('click', () => {
-            menuToggle.classList.toggle('active');
-            mobileMenu.classList.toggle('active');
-            document.body.style.overflow = mobileMenu.classList.contains('active') ? 'hidden' : '';
+            const isOpen = !mobileMenu.classList.contains('active');
+            menuToggle.classList.toggle('active', isOpen);
+            mobileMenu.classList.toggle('active', isOpen);
+            menuToggle.setAttribute('aria-expanded', String(isOpen));
+            mobileMenu.setAttribute('aria-hidden', String(!isOpen));
+            document.body.style.overflow = isOpen ? 'hidden' : '';
         });
 
         mobileLinks.forEach(link => {
-            link.addEventListener('click', () => {
+            link.addEventListener('click', (e) => {
+                navigateLink(link, e);
+
+                // Remove o foco do link antes de esconder o menu.
+                // Assim o elemento focado nunca fica dentro de aria-hidden="true".
+                link.blur();
+                menuToggle.focus();
+
                 menuToggle.classList.remove('active');
                 mobileMenu.classList.remove('active');
+                menuToggle.setAttribute('aria-expanded', 'false');
+                mobileMenu.setAttribute('aria-hidden', 'true');
                 document.body.style.overflow = '';
             });
         });
@@ -204,32 +250,63 @@ document.addEventListener('DOMContentLoaded', () => {
         wrapper.insertAdjacentElement('afterend', dotsContainer);
 
         let current = 0;
-        let timer;
+        let timer = null;
+        let isVisible = false;
+        let isHovered = false;
 
-        function goToSlide(wrap, images, dotsEl, idx) {
-            current = idx;
-            wrap.scrollTo({ left: wrap.offsetWidth * idx, behavior: 'smooth' });
-            dotsEl.querySelectorAll('.slider-dot').forEach((d, i) => {
-                d.classList.toggle('active', i === idx);
+        function updateDots() {
+            dotsContainer.querySelectorAll('.slider-dot').forEach((d, i) => {
+                d.classList.toggle('active', i === current);
             });
         }
 
+        function goToSlide(wrap, images, dotsEl, idx) {
+            current = idx;
+            wrap.scrollTo({ left: wrap.offsetWidth * idx, behavior: isVisible ? 'smooth' : 'auto' });
+            updateDots();
+        }
+
         function nextSlide() {
+            if (!isVisible || isHovered || document.hidden) return;
             const next = (current + 1) % imgs.length;
             goToSlide(wrapper, imgs, dotsContainer, next);
         }
 
-        // Auto-advance every 3.5s
         function startTimer() {
-            timer = setInterval(nextSlide, 3500);
-        }
-        function stopTimer() {
-            clearInterval(timer);
+            if (timer || !isVisible || isHovered || document.hidden) return;
+            timer = setInterval(nextSlide, 5000);
         }
 
-        startTimer();
-        wrapper.addEventListener('mouseenter', stopTimer);
-        wrapper.addEventListener('mouseleave', startTimer);
+        function stopTimer() {
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+            }
+        }
+
+        const sliderObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                isVisible = entry.isIntersecting;
+                if (isVisible) startTimer();
+                else stopTimer();
+            });
+        }, { root: null, threshold: 0.1 });
+
+        sliderObserver.observe(wrapper);
+
+        wrapper.addEventListener('mouseenter', () => {
+            isHovered = true;
+            stopTimer();
+        });
+        wrapper.addEventListener('mouseleave', () => {
+            isHovered = false;
+            startTimer();
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) stopTimer();
+            else startTimer();
+        });
 
         // Click image to open lightbox
         imgs.forEach((img, i) => {
@@ -380,3 +457,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
 });
 
+
+
+    // --- Premium About Timeline ---
+    const aboutTimeline = document.querySelector('.about-timeline');
+    if (aboutTimeline) {
+        aboutTimeline.removeAttribute('style');
+        aboutTimeline.innerHTML = `
+            <div class="timeline-head">
+                <div>
+                    <span class="timeline-kicker">ESTANISLAU / EVOLUTION</span>
+                    <h3 class="timeline-title">A construir o próximo capítulo.</h3>
+                </div>
+                <span class="timeline-live"><i></i> EM MOVIMENTO</span>
+            </div>
+            <div class="premium-timeline">
+                <div class="timeline-line" aria-hidden="true"><span></span></div>
+                <article class="timeline-item" data-timeline><span class="timeline-index">01</span><div class="timeline-marker"><span></span></div><div class="timeline-card"><span class="timeline-tag">ORIGINS</span><h4>Os primeiros passos</h4><p>Curiosidade, perguntas e a vontade de entender como as coisas funcionam.</p></div></article>
+                <article class="timeline-item timeline-item-offset" data-timeline><span class="timeline-index">02</span><div class="timeline-marker"><span></span></div><div class="timeline-card"><span class="timeline-tag">EXPLORE</span><h4>Descobrir a tecnologia</h4><p>Comecei a explorar programação e a transformar curiosidade em pequenas experiências.</p></div></article>
+                <article class="timeline-item" data-timeline><span class="timeline-index">03</span><div class="timeline-marker"><span></span></div><div class="timeline-card"><span class="timeline-tag">BUILD</span><h4>Primeiros projetos</h4><p>Aprender deixou de ser apenas estudar. Comecei a construir sistemas que podiam ser usados.</p></div></article>
+                <article class="timeline-item timeline-item-offset" data-timeline><span class="timeline-index">04</span><div class="timeline-marker"><span></span></div><div class="timeline-card"><span class="timeline-tag">NOW</span><h4>Construir, experimentar, aprender</h4><p>Web, IA, automação e produtos digitais — sempre com a próxima ideia em mente.</p></div></article>
+                <article class="timeline-item timeline-next" data-timeline><span class="timeline-index">∞</span><div class="timeline-marker"><span></span></div><div class="timeline-card timeline-next-card"><span class="timeline-tag">NEXT</span><h4>Still building.</h4><p>A linha continua. O próximo capítulo ainda está a ser escrito.</p></div></article>
+            </div>`;
+    }
+
+
+    // --- Premium Timeline: activate each chapter as it enters the viewport ---
+    const timelineItems = document.querySelectorAll('[data-timeline]');
+    if (timelineItems.length) {
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        if (reducedMotion || !('IntersectionObserver' in window)) {
+            timelineItems.forEach(item => item.classList.add('is-visible'));
+        } else {
+            const timelineObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) return;
+                    entry.target.classList.add('is-visible');
+                    observer.unobserve(entry.target);
+                });
+            }, {
+                threshold: 0.22,
+                rootMargin: '0px 0px -8% 0px'
+            });
+
+            timelineItems.forEach(item => timelineObserver.observe(item));
+        }
+    }
